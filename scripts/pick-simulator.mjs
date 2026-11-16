@@ -1,6 +1,6 @@
 // Picks and boots an iPhone simulator on the GitHub macOS runner.
 //   node scripts/pick-simulator.mjs newest   -> the newest iOS runtime installed
-//   node scripts/pick-simulator.mjs older    -> the newest runtime of an OLDER major iOS version (if any)
+//   node scripts/pick-simulator.mjs older    -> an older major iOS version, else the oldest other runtime (none: udid empty)
 // Prints `udid=`, `name=`, `version=` lines for $GITHUB_OUTPUT (udid empty: no such runtime here).
 // Everything else goes to stderr.
 import { execFileSync } from 'node:child_process'
@@ -19,7 +19,8 @@ log('iOS runtimes:', runtimes.map((r) => r.version).join(', ') || 'none')
 let runtime = runtimes[0]
 if (which === 'older' && runtime) {
   const major = Number(runtime.version.split('.')[0])
-  runtime = runtimes.find((r) => Number(r.version.split('.')[0]) < major)
+  // An older major version when there is one, else the oldest other runtime (e.g. 26.2 beside 26.5).
+  runtime = runtimes.find((r) => Number(r.version.split('.')[0]) < major) ?? (runtimes.length > 1 ? runtimes[runtimes.length - 1] : undefined)
 }
 if (!runtime) {
   log(`no ${which} iOS runtime on this runner`)

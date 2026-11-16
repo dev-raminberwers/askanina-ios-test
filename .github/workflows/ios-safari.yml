@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # newest: the newest iOS runtime on the runner; older: the newest of an older major version, when preinstalled.
+        # newest: the newest iOS runtime on the runner; older: an older major version, else the oldest other runtime installed.
         ios: [newest, older]
     env:
       # Inputs go through env, never straight into a script (no injection).

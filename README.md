@@ -3,8 +3,8 @@
 An automated check of the AskAnina web app on **Mobile Safari in the iOS Simulator**, on GitHub's
 hosted macOS runners. It holds only the test runner and the workflow: no app source, no secrets.
 
-What one run does, per iOS version (the newest runtime on the runner, plus an older major version
-when one is preinstalled):
+What one run does, per iOS version (the newest runtime on the runner, plus an older one: an older
+major version when one is preinstalled, else the oldest other runtime, e.g. 26.2 beside 26.5):
 
 1. asks the AskAnina server for a fresh test account (pre-confirmed, not set up yet, deleted by the
    server after 24 hours), with the repository secret `ASKANINA_TEST_TOKEN`;
