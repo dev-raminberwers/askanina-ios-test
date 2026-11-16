@@ -187,7 +187,6 @@ async function clickMarked(mark) {
 }
 
 async function main() {
-  const account = await newTestAccount()
   driver = await remote({
     hostname: '127.0.0.1',
     port: Number(env('APPIUM_PORT', '4723')),
@@ -218,6 +217,9 @@ async function main() {
     await driver.execute(COLLECTOR)
     await waitFor('the sign-in page', (s) => s.login)
   })
+
+  // Only now the account: Safari and the app are checked first, also without the server's token.
+  const account = await newTestAccount()
 
   await step('sign-in', async () => {
     const email = await driver.$('#login-email')
