@@ -1,0 +1,12 @@
+{
+  "name": "askanina-ios-test",
+  "private": true,
+  "description": "AskAnina's web app on Mobile Safari in the iOS Simulator (GitHub Actions, Appium XCUITest)",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node run.mjs" },
+  "dependencies": {
+    "webdriverio": "9.32.0"
+  }
+}

@@ -1,0 +1,96 @@
+name: iOS Safari sign-up test
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Web app address (https, askanina.com only)
+        required: false
+        default: https://app.askanina.com
+  repository_dispatch:
+    types: [ios-test]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-safari-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  safari:
+    name: Safari ${{ matrix.ios }} iOS
+    runs-on: macos-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        # newest: the newest iOS runtime on the runner; older: the newest of an older major version, when preinstalled.
+        ios: [newest, older]
+    env:
+      # Inputs go through env, never straight into a script (no injection).
+      APP_URL: ${{ github.event.inputs.url || github.event.client_payload.url || 'https://app.askanina.com' }}
+      API_BASE: https://askanina.com/v3
+      APPIUM_VERSION: 3.9.0
+      XCUITEST_VERSION: 12.22.8
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install the test runner
+        run: npm ci
+
+      - name: Install Appium and the XCUITest driver
+        run: |
+          npm install -g "appium@${APPIUM_VERSION}"
+          appium driver install "xcuitest@${XCUITEST_VERSION}"
+          xcodebuild -version
+
+      - name: Pick and boot the simulator
+        id: sim
+        run: node scripts/pick-simulator.mjs "${{ matrix.ios }}" >> "$GITHUB_OUTPUT"
+
+      - name: No older iOS here
+        if: steps.sim.outputs.udid == ''
+        run: echo "::notice::No ${{ matrix.ios }} iOS runtime is preinstalled on this runner; skipped."
+
+      - name: Start Appium
+        if: steps.sim.outputs.udid != ''
+        run: |
+          mkdir -p out
+          nohup appium --address 127.0.0.1 --port 4723 --log-timestamp --log-no-colors --log out/appium.log > /dev/null 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:4723/status > /dev/null && exit 0
+            sleep 2
+          done
+          echo "Appium did not start"; exit 1
+
+      - name: Sign up on Mobile Safari
+        if: steps.sim.outputs.udid != ''
+        env:
+          TEST_ACCOUNT_TOKEN: ${{ secrets.ASKANINA_TEST_TOKEN }}
+          SIM_UDID: ${{ steps.sim.outputs.udid }}
+          SIM_NAME: ${{ steps.sim.outputs.name }}
+          SIM_VERSION: ${{ steps.sim.outputs.version }}
+        run: node run.mjs
+
+      - name: Simulator log
+        if: always() && steps.sim.outputs.udid != ''
+        run: |
+          pkill -f appium || true
+          mkdir -p out
+          # The runner cleans the password out of Appium's log at its end; did it not get there, the log stays private.
+          [ -f out/steps.json ] || rm -f out/appium.log
+          xcrun simctl spawn "${{ steps.sim.outputs.udid }}" log show --last 30m --style compact --predicate 'process == "MobileSafari" OR process == "com.apple.WebKit.WebContent"' > out/simulator-safari.log 2>&1 || true
+
+      - name: Screenshots and logs
+        if: always() && steps.sim.outputs.udid != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-safari-${{ matrix.ios }}-${{ steps.sim.outputs.version }}
+          path: out/
+          retention-days: 14
+          if-no-files-found: warn
