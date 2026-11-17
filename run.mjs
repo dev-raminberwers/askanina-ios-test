@@ -233,6 +233,19 @@ async function main() {
     return s.hash
   })
 
+  // Like a real user who confirms the e-mail in the Mail app (2026-11-17, the first iPhone user got stuck
+  // right after this): Safari goes to the background for a while and comes back. iOS may close the
+  // page's IndexedDB connections meanwhile; everything after this must still work.
+  const appSwitch = async (why) => {
+    await step(`app-switch-${why}`, async () => {
+      await driver.execute('mobile: backgroundApp', { seconds: 15 })
+      await driver.pause(2000)
+      await check(`after switching apps (${why})`)
+      return 'Safari 15 s in the background and back'
+    })
+  }
+  await appSwitch('after-sign-in')
+
   // Every step of the sign up: "Next" is the last button of the footer (Start free on the plans, Start at the end).
   const seen = new Set()
   for (let round = 0; round < 20; round++) {
@@ -253,6 +266,10 @@ async function main() {
       })
       if (storage) {
         if (!/anina cloud/i.test(storage[0] ?? '')) throw new Error(`The first storage card is not Anina Cloud: ${storage.join(', ')}`)
+        // Away once more right on this step, where the first iPhone user got stuck.
+        await driver.execute('mobile: backgroundApp', { seconds: 15 })
+        await driver.pause(2000)
+        note += ' / back from 15 s in the background'
         await clickMarked('cloud')
         await waitFor('choosing Anina Cloud', () => true)
         const chosen = await driver.execute(() => document.querySelector('[data-ios-test="cloud"]')?.getAttribute('aria-checked'))
