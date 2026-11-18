@@ -186,6 +186,34 @@ async function clickMarked(mark) {
   await element.click()
 }
 
+/**
+ * Back from the background: Safari in front again, a native sheet (such as "Save password?") out of
+ * the way, and the test attached to the page again. On newer iOS the Web Inspector target of the page
+ * changes after a trip to the background ("No targets found"); that is the test tool, not the app.
+ */
+async function backToSafari() {
+  try { await driver.execute('mobile: activateApp', { bundleId: 'com.apple.mobilesafari' }) } catch {}
+  try { await driver.dismissAlert() } catch {}
+  const deadline = Date.now() + STEP_MS
+  let lastError
+  while (Date.now() < deadline) {
+    try {
+      const contexts = await driver.getContexts()
+      const web = contexts.map((c) => (typeof c === 'string' ? c : c.id)).filter((id) => String(id).startsWith('WEBVIEW'))
+      if (web.length) {
+        await driver.switchContext(web[web.length - 1])
+        await driver.execute(() => location.href)
+        return
+      }
+    } catch (error) {
+      lastError = error
+      try { await driver.dismissAlert() } catch {}
+    }
+    await driver.pause(1000)
+  }
+  throw new Error(`Safari's page did not come back after the background: ${lastError?.message ?? 'no web context'}`)
+}
+
 async function main() {
   driver = await remote({
     hostname: '127.0.0.1',
@@ -239,7 +267,7 @@ async function main() {
   const appSwitch = async (why) => {
     await step(`app-switch-${why}`, async () => {
       await driver.execute('mobile: backgroundApp', { seconds: 15 })
-      await driver.pause(2000)
+      await backToSafari()
       await check(`after switching apps (${why})`)
       return 'Safari 15 s in the background and back'
     })
@@ -268,7 +296,7 @@ async function main() {
         if (!/anina cloud/i.test(storage[0] ?? '')) throw new Error(`The first storage card is not Anina Cloud: ${storage.join(', ')}`)
         // Away once more right on this step, where the first iPhone user got stuck.
         await driver.execute('mobile: backgroundApp', { seconds: 15 })
-        await driver.pause(2000)
+        await backToSafari()
         note += ' / back from 15 s in the background'
         await clickMarked('cloud')
         await waitFor('choosing Anina Cloud', () => true)
